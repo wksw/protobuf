@@ -36,6 +36,7 @@ package grpc
 
 import (
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 
@@ -52,10 +53,15 @@ const generatedCodeVersion = 6
 // Paths for packages used by code generated in this file,
 // relative to the import_prefix of the generator.Generator.
 const (
-	contextPkgPath = "context"
-	grpcPkgPath    = "google.golang.org/grpc"
-	codePkgPath    = "google.golang.org/grpc/codes"
-	statusPkgPath  = "google.golang.org/grpc/status"
+	corePkgPath     = "github.com/go-chassis/go-chassis/v2/core"
+	commonPkgPath   = "github.com/go-chassis/go-chassis/v2/core/common"
+	contextPkgPath  = "golang.org/x/net/context"
+	clientPkgPath   = "github.com/go-chassis/go-chassis-extension/grpc/client"
+	metadataPkgPath = "google.golang.org/grpc/metadata"
+
+	grpcPkgPath   = "google.golang.org/grpc"
+	codePkgPath   = "google.golang.org/grpc/codes"
+	statusPkgPath = "google.golang.org/grpc/status"
 )
 
 func init() {
@@ -77,13 +83,24 @@ func (g *grpc) Name() string {
 // They may vary from the final path component of the import path
 // if the name is used by other packages.
 var (
-	contextPkg string
-	grpcPkg    string
+	corePkg     string
+	commonPkg   string
+	contextPkg  string
+	clientPkg   string
+	metadataPkg string
+
+	grpcPkg string
+
+	pkgImports map[generator.GoPackageName]bool
 )
 
 // Init initializes the plugin.
 func (g *grpc) Init(gen *generator.Generator) {
 	g.gen = gen
+	corePkg = generator.RegisterUniquePackageName("core", nil)
+	commonPkg = generator.RegisterUniquePackageName("common", nil)
+	contextPkg = generator.RegisterUniquePackageName("context", nil)
+	metadataPkg = generator.RegisterUniquePackageName("metadata", nil)
 }
 
 // Given a type name defined in a .proto, return its object.
@@ -128,6 +145,16 @@ func (g *grpc) Generate(file *generator.FileDescriptor) {
 
 // GenerateImports generates the import declaration for this file.
 func (g *grpc) GenerateImports(file *generator.FileDescriptor) {
+	if len(file.FileDescriptorProto.Service) == 0 {
+		return
+	}
+	g.P("import (")
+	g.P(corePkg, " ", strconv.Quote(path.Join(g.gen.ImportPrefix, corePkgPath)))
+	g.P("_", " ", strconv.Quote(path.Join(g.gen.ImportPrefix, clientPkgPath)))
+	g.P(commonPkg, " ", strconv.Quote(path.Join(g.gen.ImportPrefix, commonPkgPath)))
+	g.P(metadataPkg, " ", strconv.Quote(path.Join(g.gen.ImportPrefix, metadataPkgPath)))
+	g.P(")")
+	g.P()
 }
 
 // reservedClientName records whether a client name is reserved on the client side.
@@ -177,21 +204,60 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 
 	// Client structure.
 	g.P("type ", unexport(servName), "Client struct {")
-	g.P("cc ", grpcPkg, ".ClientConnInterface")
+	g.P("rpcInvoke *", corePkg, ".RPCInvoke")
+	g.P("context ", contextPkg, ".Context")
+	g.P("serviceName ", " string")
 	g.P("}")
 	g.P()
+
+	g.P("var _ ", servName, "Client = &", unexport(servName), "Client{}")
+
+	// newCotext
+	/*
+		func newContext(ctx context.Context) context.Context {
+			md, _ := metadata.FromIncomingContext(ctx)
+			var header = make(map[string]string)
+			for key, value := range md {
+				if len(value) > 0 {
+					header[key] = value[0]
+				}
+			}
+			return common.NewContext(header)
+		}
+	*/
+	g.P("func newContext(ctx ", contextPkg, ".Context", ") ", contextPkg, ".Context {")
+	g.P("md, _ := ", metadataPkg, ".FromIncomingContext(ctx)")
+	g.P("var header = make(map[string]string)")
+	g.P("for key, value := range md {")
+	g.P("if len(value)>0 { header[key]=value[0] }")
+	g.P("}")
+	g.P("return ", commonPkg, ".NewContext(header)")
+	g.P("}")
 
 	// NewClient factory.
 	if deprecated {
 		g.P(deprecationComment)
 	}
-	g.P("func New", servName, "Client (cc ", grpcPkg, ".ClientConnInterface) ", servName, "Client {")
-	g.P("return &", unexport(servName), "Client{cc}")
+	/*
+		func NewAccountClient(ctx context.Context, opt ...core.Option) AccountService {
+			return &accountService{
+				RPCInvoker:  core.NewRPCInvoker(opt...),
+				context:     newContext(ctx),
+				serviceName: serviceName,
+			}
+		}
+	*/
+	g.P("func New", servName, "Client (ctx ", contextPkg, ".Context, ", "serviceName string, ", "opt ...", corePkg, ".Option) ", servName, " {")
+	g.P("return &", unexport(servName), "{")
+	g.P("RPCInvoker: ", corePkg, ".NewRPCInvoker(opt...),")
+	g.P("context: newContext(ctx),")
+	g.P("serviceName: serviceName,")
+	g.P("}")
 	g.P("}")
 	g.P()
 
 	var methodIndex, streamIndex int
-	serviceDescVar := "_" + servName + "_serviceDesc"
+	serviceDescVar := servName + "_serviceDesc"
 	// Client method implementations.
 	for _, method := range service.Method {
 		var descExpr string
@@ -321,7 +387,7 @@ func (g *grpc) generateClientSignature(servName string, method *pb.MethodDescrip
 	if reservedClientName[methName] {
 		methName += "_"
 	}
-	reqArg := ", in *" + g.typeName(method.GetInputType())
+	reqArg := "in *" + g.typeName(method.GetInputType())
 	if method.GetClientStreaming() {
 		reqArg = ""
 	}
@@ -329,7 +395,7 @@ func (g *grpc) generateClientSignature(servName string, method *pb.MethodDescrip
 	if method.GetServerStreaming() || method.GetClientStreaming() {
 		respName = servName + "_" + generator.CamelCase(origMethName) + "Client"
 	}
-	return fmt.Sprintf("%s(ctx %s.Context%s, opts ...%s.CallOption) (%s, error)", methName, contextPkg, reqArg, grpcPkg, respName)
+	return fmt.Sprintf("%s(%s) (%s, error)", methName, reqArg, respName)
 }
 
 func (g *grpc) generateClientMethod(servName, fullServName, serviceDescVar string, method *pb.MethodDescriptorProto, descExpr string) {
@@ -344,9 +410,10 @@ func (g *grpc) generateClientMethod(servName, fullServName, serviceDescVar strin
 	g.P("func (c *", unexport(servName), "Client) ", g.generateClientSignature(servName, method), "{")
 	if !method.GetServerStreaming() && !method.GetClientStreaming() {
 		g.P("out := new(", outType, ")")
+		g.P(`err := c.rpcInvoker.Invoke(c.context, c.serviceName,"`, fullServName, `", "`, method.GetName(), `", in, out,`, corePkg, `.WithProtocol("grpc"))`)
 		// TODO: Pass descExpr to Invoke.
-		g.P(`err := c.cc.Invoke(ctx, "`, sname, `", in, out, opts...)`)
-		g.P("if err != nil { return nil, err }")
+		// g.P(`err := c.cc.Invoke(ctx, "`, sname, `", in, out, opts...)`)
+		// g.P("if err != nil { return nil, err }")
 		g.P("return out, nil")
 		g.P("}")
 		g.P()
