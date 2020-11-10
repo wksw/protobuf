@@ -204,7 +204,7 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 
 	// Client structure.
 	g.P("type ", unexport(servName), "Client struct {")
-	g.P("rpcInvoke *", corePkg, ".RPCInvoke")
+	g.P("rpcInvoker *", corePkg, ".RPCInvoker")
 	g.P("context ", contextPkg, ".Context")
 	g.P("serviceName ", " string")
 	g.P("}")
@@ -241,15 +241,15 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 	/*
 		func NewAccountClient(ctx context.Context, opt ...core.Option) AccountService {
 			return &accountService{
-				RPCInvoker:  core.NewRPCInvoker(opt...),
+				rpcInvoker:  core.NewRPCInvoker(opt...),
 				context:     newContext(ctx),
 				serviceName: serviceName,
 			}
 		}
 	*/
-	g.P("func New", servName, "Client (ctx ", contextPkg, ".Context, ", "serviceName string, ", "opt ...", corePkg, ".Option) ", servName, " {")
-	g.P("return &", unexport(servName), "{")
-	g.P("RPCInvoker: ", corePkg, ".NewRPCInvoker(opt...),")
+	g.P("func New", servName, "Client (ctx ", contextPkg, ".Context, ", "serviceName string, ", "opt ...", corePkg, ".Option) ", servName, "Client {")
+	g.P("return &", unexport(servName), "Client {")
+	g.P("rpcInvoker: ", corePkg, ".NewRPCInvoker(opt...),")
 	g.P("context: newContext(ctx),")
 	g.P("serviceName: serviceName,")
 	g.P("}")
@@ -414,7 +414,7 @@ func (g *grpc) generateClientMethod(servName, fullServName, serviceDescVar strin
 		// TODO: Pass descExpr to Invoke.
 		// g.P(`err := c.cc.Invoke(ctx, "`, sname, `", in, out, opts...)`)
 		// g.P("if err != nil { return nil, err }")
-		g.P("return out, nil")
+		g.P("return out, err")
 		g.P("}")
 		g.P()
 		return
