@@ -56,7 +56,7 @@ const (
 	corePkgPath     = "github.com/go-chassis/go-chassis/v2/core"
 	commonPkgPath   = "github.com/go-chassis/go-chassis/v2/core/common"
 	contextPkgPath  = "golang.org/x/net/context"
-	clientPkgPath   = "github.com/go-chassis/go-chassis-extension/grpc/client"
+	clientPkgPath   = "github.com/go-chassis/go-chassis-extension/protocol/grpc/client"
 	metadataPkgPath = "google.golang.org/grpc/metadata"
 
 	grpcPkgPath   = "google.golang.org/grpc"
