@@ -239,10 +239,10 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 		g.P(deprecationComment)
 	}
 	/*
-		func NewAccountClient(ctx context.Context, opt ...core.Option) AccountService {
+		func NewAccountClient(ctx context.Context, serviceName string, opt ...core.Option) AccountService {
 			return &accountService{
 				rpcInvoker:  core.NewRPCInvoker(opt...),
-				context:     newContext(ctx),
+				context:     ctx,
 				serviceName: serviceName,
 			}
 		}
