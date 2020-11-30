@@ -250,7 +250,7 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 	g.P("func New", servName, "Client (ctx ", contextPkg, ".Context, ", "serviceName string, ", "opt ...", corePkg, ".Option) ", servName, "Client {")
 	g.P("return &", unexport(servName), "Client {")
 	g.P("rpcInvoker: ", corePkg, ".NewRPCInvoker(opt...),")
-	g.P("context: ", commonPkg, ".TransformContext(ctx)")
+	g.P("context: ", commonPkg, ".TransformContext(ctx),")
 	g.P("serviceName: serviceName,")
 	g.P("}")
 	g.P("}")
