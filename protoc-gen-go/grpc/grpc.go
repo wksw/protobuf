@@ -222,7 +222,7 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 	*/
 	g.P("func transformContext(ctx ", contextPkg, ".Context", ") ", contextPkg, ".Context {")
 	g.P("m := ", commonPkg, ".FromContext(ctx)")
-	g.P("md := ", metadataPkg, ".New(m")
+	g.P("md := ", metadataPkg, ".New(m)")
 	g.P("return ", metadataPkg, ".NewOutgoingContext(ctx, md)")
 	g.P("}")
 
@@ -244,6 +244,7 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 	g.P("rpcInvoker: ", corePkg, ".NewRPCInvoker(opt...),")
 	g.P("context: ", "transformContext(ctx),")
 	g.P("serviceName: serviceName,")
+	g.P("}")
 	g.P("}")
 	g.P()
 
