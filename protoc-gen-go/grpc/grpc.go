@@ -245,7 +245,6 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 	g.P("context: ", "transformContext(ctx),")
 	g.P("serviceName: serviceName,")
 	g.P("}")
-	g.P("}")
 	g.P()
 
 	var methodIndex, streamIndex int
