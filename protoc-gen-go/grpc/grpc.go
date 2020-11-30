@@ -55,7 +55,7 @@ const generatedCodeVersion = 6
 const (
 	corePkgPath     = "github.com/go-chassis/go-chassis/v2/core"
 	commonPkgPath   = "github.com/go-chassis/go-chassis/v2/core/common"
-	contextPkgPath  = "golang.org/x/net/context"
+	contextPkgPath  = "context"
 	clientPkgPath   = "github.com/go-chassis/go-chassis-extension/protocol/grpc/client"
 	metadataPkgPath = "google.golang.org/grpc/metadata"
 
@@ -214,24 +214,16 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 
 	// newCotext
 	/*
-		func newContext(ctx context.Context) context.Context {
-			md, _ := metadata.FromIncomingContext(ctx)
-			var header = make(map[string]string)
-			for key, value := range md {
-				if len(value) > 0 {
-					header[key] = value[0]
-				}
-			}
-			return common.NewContext(header)
+		func transformContext(ctx context.Context) context.Context {
+			m := common.FromContext(ctx)
+			md := metadata.New(m)
+			return metadata.NewOutgoingContext(ctx, md)
 		}
 	*/
-	g.P("func newContext(ctx ", contextPkg, ".Context", ") ", contextPkg, ".Context {")
-	g.P("md, _ := ", metadataPkg, ".FromIncomingContext(ctx)")
-	g.P("var header = make(map[string]string)")
-	g.P("for key, value := range md {")
-	g.P("if len(value)>0 { header[key]=value[0] }")
-	g.P("}")
-	g.P("return ", commonPkg, ".NewContext(header)")
+	g.P("func transformContext(ctx ", contextPkg, ".Context", ") ", contextPkg, ".Context {")
+	g.P("m := ", commonPkg, ".FromContext(ctx)")
+	g.P("md := ", metadataPkg, ".New(m")
+	g.P("return ", metadataPkg, ".NewOutgoingContext(ctx, md)")
 	g.P("}")
 
 	// NewClient factory.
@@ -250,7 +242,7 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 	g.P("func New", servName, "Client (ctx ", contextPkg, ".Context, ", "serviceName string, ", "opt ...", corePkg, ".Option) ", servName, "Client {")
 	g.P("return &", unexport(servName), "Client {")
 	g.P("rpcInvoker: ", corePkg, ".NewRPCInvoker(opt...),")
-	g.P("context: ", commonPkg, ".TransformContext(ctx),")
+	g.P("context: ", "transformContext(ctx),")
 	g.P("serviceName: serviceName,")
 	g.P("}")
 	g.P("}")
